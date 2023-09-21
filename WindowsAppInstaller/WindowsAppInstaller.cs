@@ -12,6 +12,7 @@ string installPath = $"C:\\Program Files\\{folderName}";
 string installShortcutPath = "Programs";
 string sourceFilePath = $"{currentDirectory}\\SetupFile";
 string exeFilteName = $"{sourceFilePath}\\{folderName}.exe";
+string shortCutTargetPath = $"{installPath}\\{folderName}.exe";
 
 Console.WriteLine("Please wait program has started...");
 Console.WriteLine(Environment.NewLine, Environment.NewLine);
@@ -67,7 +68,7 @@ async Task<bool> programRun()
     bool isResult = false;
     bool isInstallApp = await Task.Run(() => InstallApp());
     bool isSetAdminstration = await Task.Run(() => SetAdminstration(exeFilteName));
-    bool isCreateShortcut = await Task.Run(() => CreateShortcut(installShortcutPath, exeFilteName, folderName));
+    bool isCreateShortcut = await Task.Run(() => CreateShortcut(installShortcutPath, shortCutTargetPath, folderName));
 
     if (isInstallApp && isSetAdminstration && isCreateShortcut)
         isResult = true;
