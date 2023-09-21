@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using IWshRuntimeLibrary;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 
@@ -8,7 +9,7 @@ string userProfilePath =
 string currentDirectory = Directory.GetCurrentDirectory();
 string folderName = "WindowsCachClean";
 string installPath = $"C:\\Program Files\\{folderName}";
-string installShortcutPath = $"{userProfilePath}\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs";
+string installShortcutPath = "Programs";
 string sourceFilePath = $"{currentDirectory}\\SetupFile";
 string exeFilteName = $"{sourceFilePath}\\{folderName}.exe";
 
@@ -17,11 +18,8 @@ Console.WriteLine(Environment.NewLine, Environment.NewLine);
 
 if (RequireAdministrator())
 {
-    await Task.Run(() => InstallApp());
-    await Task.Run(() => SetAdminstration());
-    await Task.Run(() => CreateShortcut());
-
-    Console.WriteLine("Install Successfully...");
+    if (await programRun())
+        Console.WriteLine("Install Successfully...");
 }
 else
 {
@@ -64,69 +62,94 @@ bool RequireAdministrator()
     return true;
 }
 
-void InstallApp()
+async Task<bool> programRun()
 {
+    bool isResult = false;
+    bool isInstallApp = await Task.Run(() => InstallApp());
+    bool isSetAdminstration = await Task.Run(() => SetAdminstration(exeFilteName));
+    bool isCreateShortcut = await Task.Run(() => CreateShortcut(installShortcutPath, exeFilteName, folderName));
+
+    if (isInstallApp && isSetAdminstration && isCreateShortcut)
+        isResult = true;
+
+    return isResult;
+}
+
+bool InstallApp()
+{
+    bool isResult = false;
     try
     {
         if (!Directory.EnumerateFiles(sourceFilePath).Any())
-            return;
+            return isResult;
 
         if (!Directory.Exists(installPath))
         {
             Directory.CreateDirectory(installPath);
         }
 
-        File.Copy(sourceFilePath, installPath, true);
+        string[] files = Directory.GetFiles(sourceFilePath);
+        Array.ForEach(files, file =>
+        {
+            string fileName = Path.GetFileName(file);
+            string destinationPath = Path.Combine(installPath, fileName);
+            System.IO.File.Copy(file, destinationPath, true);
+        });
+
+        isResult = true;
     }
     catch (Exception ex)
     {
         Console.WriteLine(ex.Message);
     }
+
+    return isResult;
 }
 
-void CreateShortcut()
+bool CreateShortcut(string destinationDirectoryName, string targetPath, string fileName)
 {
+    bool isResult = false;
     try
     {
-        // Create a WshShell object
+        object shpath = (object)destinationDirectoryName;
         var shell = new WshShell();
-
-        // Create a new shortcut
-        IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(installShortcutPath);
-
-        // Set the properties of the shortcut
-        shortcut.TargetPath = installPath;
-        shortcut.WorkingDirectory = System.IO.Path.GetDirectoryName(installPath); // Set working directory
-        shortcut.Arguments = ""; // Set any command-line arguments here
-        shortcut.Description = "My Shortcut"; // Set a description for the shortcut
-        shortcut.IconLocation = installPath; // Set the icon for the shortcut
-
-        // Set to run as administrator
+        string shortcutAddress = (string)shell.SpecialFolders.Item(ref shpath) + @"\" + fileName + ".lnk";
+        // Create a shortcut
+        IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(shortcutAddress);
+        shortcut.TargetPath = targetPath; // Replace with the path to the target file or program
+        shortcut.WorkingDirectory = shortcutAddress; // Optional: set the working directory
+        //shortcut.Description = "My Shortcut"; // Optional: set a description for the shortcut
+        //shortcut.IconLocation = @"C:\Path\To\Your\Icon.ico"; // Optional: set the icon for the shortcut
         shortcut.Save();
-        System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo(installShortcutPath);
-        startInfo.UseShellExecute = true;
-        startInfo.Verb = "runas"; // This will run the shortcut as administrator
+
+        isResult = true;
 
     }
     catch (Exception ex)
     {
         Console.WriteLine(ex.Message);
     }
+
+    return isResult;
 }
 
-void SetAdminstration()
+bool SetAdminstration(string fileName)
 {
+    bool isResult = false;
     try
     {
-        ProcessStartInfo startInfo = new ProcessStartInfo(exeFilteName);
+        ProcessStartInfo startInfo = new ProcessStartInfo(fileName);
         startInfo.UseShellExecute = true;
         startInfo.Verb = "runas"; // This will run the executable as administrator
 
         Process.Start(startInfo);
 
+        isResult = true;
     }
     catch (Exception ex)
     {
         Console.WriteLine(ex.Message);
     }
+
+    return isResult;
 }
